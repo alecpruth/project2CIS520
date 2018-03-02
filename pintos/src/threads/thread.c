@@ -4,7 +4,6 @@
 #include <random.h>
 #include <stdio.h>
 #include <string.h>
-#include "lib/kernel/list.h"
 #include "threads/flags.h"
 #include "threads/interrupt.h"
 #include "threads/intr-stubs.h"
@@ -20,8 +19,6 @@
    Used to detect stack overflow.  See the big comment at the top
    of thread.h for details. */
 #define THREAD_MAGIC 0xcd6abf4b
-
-#define THREAD_PTR_NULL (struct thread *)0
 
 /* List of processes in THREAD_READY state, that is, processes
    that are ready to run but not actually running. */
@@ -150,18 +147,6 @@ thread_print_stats (void)
           idle_ticks, kernel_ticks, user_ticks);
 }
 
-// possible implementation to find priority, have not used 
-bool 
-compare_priority(const struct list_elem *a, const struct list_elem *b, void *aux UNUSED){
-    struct thread *threadA = list_entry(a, struct thread, elem);
-    struct thread *threadB = list_entry(b, struct thread, elem);
-    if (threadA -> priority > threadB->priority)
-    {
-        return true;
-    }
-    return false;
-}
-
 /* Creates a new kernel thread named NAME with the given initial
    PRIORITY, which executes FUNCTION passing AUX as the argument,
    and adds it to the ready queue.  Returns the thread identifier
@@ -215,14 +200,7 @@ thread_create (const char *name, int priority,
 
   /* Add to run queue. */
   thread_unblock (t);
- 
-  struct thread *curr_thread = thread_current();
-  if(t->priority > curr_thread->priority)
-  {
-      thread_yield();
-  }
-  
-  
+
   return tid;
 }
 
@@ -259,8 +237,7 @@ thread_unblock (struct thread *t)
 
   old_level = intr_disable ();
   ASSERT (t->status == THREAD_BLOCKED);
-  list_insert_priority(&ready_list, &t->elem);
-  //list_push_back (&ready_list, &t->elem);
+  list_push_back (&ready_list, &t->elem);
   t->status = THREAD_READY;
   intr_set_level (old_level);
 }
@@ -330,8 +307,8 @@ thread_yield (void)
   ASSERT (!intr_context ());
 
   old_level = intr_disable ();
-  if (cur != idle_thread) list_insert_priority(&ready_list, &cur->elem);
-    //list_push_back (&ready_list, &cur->elem);
+  if (cur != idle_thread) 
+    list_push_back (&ready_list, &cur->elem);
   cur->status = THREAD_READY;
   schedule ();
   intr_set_level (old_level);
@@ -358,19 +335,7 @@ thread_foreach (thread_action_func *func, void *aux)
 void
 thread_set_priority (int new_priority) 
 {
-  struct thread * thread_curr = thread_current();
-  struct list_elem * donee_elem;
-  struct thread * donee_thread;
-  
-  thread_curr->priority = new_priority;
-  // Implement priority donation to all the donee thread
-  while(!list_empty(&thread_curr->donees_list)) {
-      donee_elem = list_pop_front(&thread_curr->donees_list);
-      donee_thread = list_entry(donee_elem, struct thread, lock_elem);
-      donate_priority(thread_curr, donee_thread);
-    }
-   
-  // Make sure that the prev_priority is updated only once
+  thread_current ()->priority = new_priority;
 }
 
 /* Returns the current thread's priority. */
@@ -498,13 +463,9 @@ init_thread (struct thread *t, const char *name, int priority)
   t->stack = (uint8_t *) t + PGSIZE;
   t->priority = priority;
   t->magic = THREAD_MAGIC;
-  list_init(&t->donors_list);
-  list_init(&t->donees_list);
 
   old_level = intr_disable ();
-  //@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@
-  //list_push_back (&all_list, &t->allelem);
-  list_insert_priority (&all_list, &t->allelem);
+  list_push_back (&all_list, &t->allelem);
   intr_set_level (old_level);
 }
 
@@ -531,26 +492,9 @@ next_thread_to_run (void)
 {
   if (list_empty (&ready_list))
     return idle_thread;
-  else{
-    //list_sort(&ready_list);
+  else
     return list_entry (list_pop_front (&ready_list), struct thread, elem);
-    } //make own function to replace list_pop_front change this return largest element 
-    //list_sort sorts ready 
-    
-    
 }
-
-struct list_elem *
-my_list_pop_front (struct list *list){
-  struct list_elem *front = my_list_max(list,compare_priority,NULL);
-  //struct list_elem *back = list_back(list);
-  
-  
-  list_remove (front);
-  return front;
-}
-
-
 
 /* Completes a thread switch by activating the new thread's page
    tables, and, if the previous thread is dying, destroying it.
@@ -638,21 +582,3 @@ allocate_tid (void)
 /* Offset of `stack' member within `struct thread'.
    Used by switch.S, which can't figure it out on its own. */
 uint32_t thread_stack_ofs = offsetof (struct thread, stack);
-
-
-void donate_priority(struct thread *donor, struct thread *donee)
-{
-    donee->prev_priority = donee->priority;
-    donee->priority = donor->priority;
-    
-    // Add the donee thread to the list of the donors in the donor thread
-    list_insert_priority(&donor->donees_list, &donee->lock_elem);
-    // Add the donor thread to the list of donees in the donee thread
-    list_insert_priority(&donee->donors_list, &donor->lock_elem);
-    // Check if the donee thread has the highest priority amongst the threads in the ready queue and execute it right away 
-    list_sort(&ready_list, priority_sorted, NULL);
-     
-    
-}
-
-

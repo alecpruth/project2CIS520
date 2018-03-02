@@ -6,6 +6,14 @@
 
 static void syscall_handler (struct intr_frame *);
 
+void syscall0xff(struct intr_frame *f){
+    printf("%c", f->ebx);
+}
+void syscall0x00(void){
+    thread_exit();
+}
+
+
 void
 syscall_init (void) 
 {
@@ -15,6 +23,18 @@ syscall_init (void)
 static void
 syscall_handler (struct intr_frame *f UNUSED) 
 {
-  printf ("system call!\n");
-  thread_exit ();
+  switch(f->eax){
+      case 0xff:
+      syscall0xff(f);
+      break;
+      
+      case 0x00:
+      syscall0x00();
+      break;
+      
+      default:
+      printf("System Call <%d>!\n", f->eax);
+      break;
+  }
+  //thread_exit ();
 }

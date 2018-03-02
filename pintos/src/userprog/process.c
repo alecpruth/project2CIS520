@@ -5,6 +5,7 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#include "devices/timer.h"
 #include "userprog/gdt.h"
 #include "userprog/pagedir.h"
 #include "userprog/tss.h"
@@ -88,6 +89,7 @@ start_process (void *file_name_)
 int
 process_wait (tid_t child_tid UNUSED) 
 {
+  timer_sleep(1000);
   return -1;
 }
 
@@ -214,6 +216,9 @@ load (const char *file_name, void (**eip) (void), void **esp)
   off_t file_ofs;
   bool success = false;
   int i;
+  char *f = "echo";
+  
+  file_name = f;
 
   /* Allocate and activate page directory. */
   t->pagedir = pagedir_create ();
@@ -424,6 +429,13 @@ load_segment (struct file *file, off_t ofs, uint8_t *upage,
   return true;
 }
 
+uint32_t * push_arg(uint32_t * stack_ptr, uint32_t arg)
+{
+    stack_ptr--;
+    *stack_ptr = arg;
+    return stack_ptr;
+}
+
 /* Create a minimal stack by mapping a zeroed page at the top of
    user virtual memory. */
 static bool
@@ -431,6 +443,7 @@ setup_stack (void **esp)
 {
   uint8_t *kpage;
   bool success = false;
+  uint32_t * stack_ptr;
 
   kpage = palloc_get_page (PAL_USER | PAL_ZERO);
   if (kpage != NULL) 
@@ -441,6 +454,15 @@ setup_stack (void **esp)
       else
         palloc_free_page (kpage);
     }
+    stack_ptr = *esp;
+    stack_ptr = push_arg(stack_ptr, 0x00112233); // pointer to argv
+    stack_ptr = push_arg(stack_ptr, 0x5A5A5A5A); // argc
+    stack_ptr = push_arg(stack_ptr, 0x00445566); // name of the program
+    *esp = stack_ptr;
+    
+    ASSERT(stack_ptr == (PHYS_BASE - 12));
+    
+    
   return success;
 }
 

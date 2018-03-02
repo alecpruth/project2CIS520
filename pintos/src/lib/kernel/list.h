@@ -109,7 +109,6 @@ struct list
         ((STRUCT *) ((uint8_t *) &(LIST_ELEM)->next     \
                      - offsetof (STRUCT, MEMBER.next)))
 
-
 /* List initialization.
 
    A list may be initialized by calling list_init():
@@ -147,7 +146,6 @@ void list_push_back (struct list *, struct list_elem *);
 /* List removal. */
 struct list_elem *list_remove (struct list_elem *);
 struct list_elem *list_pop_front (struct list *);
-struct list_elem *my_list_pop_front (struct list *list);
 struct list_elem *list_pop_back (struct list *);
 
 /* List elements. */
@@ -173,15 +171,11 @@ void list_sort (struct list *,
                 list_less_func *, void *aux);
 void list_insert_ordered (struct list *, struct list_elem *,
                           list_less_func *, void *aux);
-void list_insert_priority(struct list *list, struct list_elem *el);
-bool priority_sorted(struct list_elem *new, struct list_elem *exis, void *aux);
-void list_insert_wakeupticks(struct list *list, struct list_elem *el);
 void list_unique (struct list *, struct list *duplicates,
                   list_less_func *, void *aux);
 
 /* Max and min. */
 struct list_elem *list_max (struct list *, list_less_func *, void *aux);
-struct list_elem *my_list_max (struct list *, list_less_func *, void *aux);
 struct list_elem *list_min (struct list *, list_less_func *, void *aux);
 
 #endif /* lib/kernel/list.h */

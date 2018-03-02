@@ -1,6 +1,5 @@
 #include "list.h"
 #include "../debug.h"
-#include "threads/thread.h"
 
 /* Our doubly linked lists have two header elements: the "head"
    just before the first element and the "tail" just after the
@@ -86,10 +85,10 @@ list_next (struct list_elem *elem)
   return elem->next;
 }
 
-/* 
-   list_end() is often used in iterating through a list from
-   front to back.  See the big comment at the top of list.h forReturns LIST's tail.
+/* Returns LIST's tail.
 
+   list_end() is often used in iterating through a list from
+   front to back.  See the big comment at the top of list.h for
    an example. */
 struct list_elem *
 list_end (struct list *list)
@@ -440,30 +439,9 @@ list_sort (struct list *list, list_less_func *less, void *aux)
   ASSERT (is_sorted (list_begin (list), list_end (list), less, aux));
 }
 
-/*
-bool priority_sorted(struct list_elem *new, struct list_elem *exis, void *aux)
-{
-struct thread * exis_thread;
-struct thread * new_thread;
-
-    new_thread = list_entry(new, struct thread, elem);
-    exis_thread = list_entry(exis, struct thread, elem);
-
-    return(new_thread->priority > exis_thread->priority);
-}*/
-
-// possible implementation to find priority, have not used 
-bool 
-priority_sorted(struct list_elem *a, struct list_elem *b, void *aux){
-    struct thread *threadA = list_entry(a, struct thread, elem);
-    struct thread *threadB = list_entry(b, struct thread, elem);
-    if (threadA -> priority > threadB->priority)
-    {
-        return true;
-    }
-    return false;
-}
-
+/* Inserts ELEM in the proper position in LIST, which must be
+   sorted according to LESS given auxiliary data AUX.
+   Runs in O(n) average case in the number of elements in LIST. */
 void
 list_insert_ordered (struct list *list, struct list_elem *elem,
                      list_less_func *less, void *aux)
@@ -480,51 +458,7 @@ list_insert_ordered (struct list *list, struct list_elem *elem,
   return list_insert (e, elem);
 }
 
-void
-list_insert_priority(struct list *list, struct list_elem *el)
-{
-  struct list_elem *e;
-  const struct thread *existing;
-  const struct thread *new;
-
-  ASSERT (list != NULL);
-  ASSERT (el != NULL);
-  
-  for (e = list_begin (list); e != list_end (list); e = list_next (e)) {
-    
-    existing = list_entry(e, struct thread, elem);
-    new = list_entry(el, struct thread, elem);
-    
-    if( new->priority > existing->priority )
-        break;
-   }
-
-  return list_insert (e, el);
-}
-
-void
-list_insert_wakeupticks(struct list *list, struct list_elem *el)
-{
-  struct list_elem *e;
-  const struct thread *existing;
-  const struct thread *new;
-
-  ASSERT (list != NULL);
-  ASSERT (el != NULL);
-  
-  for (e = list_begin (list); e != list_end (list); e = list_next (e)) {
-    
-    existing = list_entry(e, struct thread, wait_elem);
-    new = list_entry(el, struct thread, wait_elem);
-    
-    if( new->wakeup_ticks < existing->wakeup_ticks )
-        break;
-   }
-
-  return list_insert (e, el);
-}
-
-/* Iterates through LIST and removes all but the first in eachor
+/* Iterates through LIST and removes all but the first in each
    set of adjacent elements that are equal according to LESS
    given auxiliary data AUX.  If DUPLICATES is non-null, then the
    elements from LIST are appended to DUPLICATES. */
@@ -565,25 +499,6 @@ list_max (struct list *list, list_less_func *less, void *aux)
       
       for (e = list_next (max); e != list_end (list); e = list_next (e))
         if (less (max, e, aux))
-          max = e; 
-    }
-  return max;
-}
-
-/* Returns the element in LIST with the largest value according
-   to LESS given auxiliary data AUX.  If there is more than one
-   maximum, returns the one that appears earlier in the list.  If
-   the list is empty, returns its tail. */
-struct list_elem *
-my_list_max (struct list *list, list_less_func *less, void *aux)
-{
-  struct list_elem *max = list_begin (list);
-  if (max != list_end (list)) 
-    {
-      struct list_elem *e;
-      
-      for (e = list_next (max); e != list_end (list); e = list_next (e))
-        if (!less (max, e, aux))
           max = e; 
     }
   return max;
