@@ -23,6 +23,9 @@ syscall_init (void)
 static void
 syscall_handler (struct intr_frame *f UNUSED) 
 {
+    
+    printf("System Call: <%d> File Descriptor: <%d> Pointer: <%d> !\n", *(uint32_t *)f->esp);
+/*
   switch(f->eax){
       case 0xff:
       syscall0xff(f);
@@ -36,5 +39,6 @@ syscall_handler (struct intr_frame *f UNUSED)
       printf("System Call <%d>!\n", f->eax);
       break;
   }
+  */ 
   //thread_exit ();
 }
