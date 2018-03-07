@@ -1,6 +1,7 @@
 #include "userprog/syscall.h"
 #include <stdio.h>
 #include <debug.h>
+#include "filesys/filesys.h"
 #include <syscall-nr.h>
 #include "threads/interrupt.h"
 #include "threads/thread.h"
@@ -14,11 +15,12 @@ syscall_init (void)
   intr_register_int (0x30, 3, INTR_ON, syscall_handler, "syscall");
 }
 
-
 static void syscall_SYS_WRITE(struct intr_frame *f){
     int fd;
     const void *buffer;
     unsigned size;
+    unsigned chars_written = 0;
+    
     fd = *(int *)(f->esp+4);
     buffer = (void *)*(uint32_t *)(f->esp+8);
     size = *(unsigned *)(f->esp+12);
@@ -26,8 +28,11 @@ static void syscall_SYS_WRITE(struct intr_frame *f){
     switch(fd){
         
      case STDOUT_FILENO:
-        while(size--)
+        while(size--){
             printf("%c", *(char *)buffer++);
+            chars_written++;
+        }
+        f->eax = chars_written;
         break;
         
      default:
@@ -37,6 +42,42 @@ static void syscall_SYS_WRITE(struct intr_frame *f){
     
     //printf("File Descriptor: <%d> Pointer: <%x> Size: <%d> !\n", fd, (unsigned) buffer, size);
     //printf("Sys write");
+}
+
+static struct file * fd_to_file_ptr[20];
+
+static void syscall_SYS_OPEN(struct intr_frame *f){
+    
+    static int fd = 3;
+    struct file *file_ptr;
+    
+    char * filename = (char *)*(uint32_t *)(f->esp+4);
+    file_ptr = filesys_open(filename);
+    
+    if( file_ptr != (struct file *)NULL) {
+        f->eax = fd;
+        fd_to_file_ptr[fd++] = file_ptr;
+    }
+    else {
+        printf("Error loading file: <%s>\n", filename);
+        f->eax = -1;
+    }
+}
+
+static void syscall_SYS_READ(struct intr_frame *f){
+    
+    int fd;
+    struct file * file_ptr;
+    char * buffer;
+    unsigned size;
+    
+    fd = *(int *)(f->esp+4);
+    buffer = (char *)*(uint32_t *)(f->esp+8);
+    size = *(unsigned *)(f->esp+12);
+    
+    file_ptr = fd_to_file_ptr[fd];
+    
+    file_read(file_ptr, buffer, size);   
 }
 
 static void syscall_SYS_EXIT(struct intr_frame *f){
@@ -73,6 +114,9 @@ syscall_handler (struct intr_frame *f UNUSED)
     switch(syscall_num){
       case SYS_WRITE:
         syscall_SYS_WRITE(f);
+        break;
+    case SYS_OPEN:
+        syscall_SYS_OPEN(f);
         break;
       
       case SYS_EXIT:
