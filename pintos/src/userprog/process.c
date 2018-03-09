@@ -5,6 +5,7 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#include "devices/timer.h"
 #include "userprog/gdt.h"
 #include "userprog/pagedir.h"
 #include "userprog/tss.h"
@@ -18,8 +19,14 @@
 #include "threads/thread.h"
 #include "threads/vaddr.h"
 
+#define INITIAL_USER_PAGE 0x08048000 - PGSIZE
+
 static thread_func start_process NO_RETURN;
 static bool load (const char *cmdline, void (**eip) (void), void **esp);
+/* load() helpers. */
+
+static bool install_page (void *upage, void *kpage, bool writable);
+
 
 /* Starts a new thread running a user program loaded from
    FILENAME.  The new thread may be scheduled (and may even exit)
@@ -48,12 +55,16 @@ process_execute (const char *file_name)
 /* A thread function that loads a user process and starts it
    running. */
 static void
-start_process (void *file_name_)
+start_process (void * cmd_string)
 {
-  char *file_name = file_name_;
+  char file_name[15];
   struct intr_frame if_;
   bool success;
-
+  char * next_ptr;
+  char * next_token;
+  
+  strlcpy(file_name, cmd_string, strcspn(cmd_string, " \t")+1);
+ 
   /* Initialize interrupt frame and load executable. */
   memset (&if_, 0, sizeof if_);
   if_.gs = if_.fs = if_.es = if_.ds = if_.ss = SEL_UDSEG;
@@ -61,10 +72,50 @@ start_process (void *file_name_)
   if_.eflags = FLAG_IF | FLAG_MBS;
   success = load (file_name, &if_.eip, &if_.esp);
 
-  /* If load failed, quit. */
-  palloc_free_page (file_name);
-  if (!success) 
-    thread_exit ();
+
+    
+  uint8_t * kpage = palloc_get_page (PAL_USER | PAL_ZERO);
+  if (kpage != NULL) 
+    {
+      if (!install_page ((uint8_t *) INITIAL_USER_PAGE, kpage, true)){
+        palloc_free_page (file_name);
+        palloc_free_page (kpage);
+        thread_exit();
+      }
+    }
+    
+    int argc = 1;
+    char ** argv;
+    
+    //reserve some space in the stack to list the argument pointers
+    if_.esp = if_.esp - (128 * 4);
+    //argv need to point to the first of the argument pointers
+    argv = if_.esp;
+    
+    
+    strlcpy((char *)INITIAL_USER_PAGE, cmd_string, strlen(cmd_string) + 1);
+    
+    /*Parse command*/
+    next_token =strtok_r((char *)INITIAL_USER_PAGE, " \t", &next_ptr);
+    
+    argv[0] = next_token;
+    
+    while(1){
+        next_token = strtok_r(NULL, " \t", &next_ptr);
+        if(next_token == NULL) 
+            break;
+        argv[argc++] = next_token;
+    }
+    
+    push_arg(&if_.esp, (uint32_t)argv);
+    push_arg(&if_.esp, (uint32_t)argc);
+    push_arg(&if_.esp, (uint32_t)&argv[0]);
+     
+    palloc_free_page (cmd_string);
+    if (!success) 
+      thread_exit ();
+  
+  
 
   /* Start the user process by simulating a return from an
      interrupt, implemented by intr_exit (in
@@ -88,6 +139,14 @@ start_process (void *file_name_)
 int
 process_wait (tid_t child_tid UNUSED) 
 {
+  struct thread * curr_thread = thread_current();
+  
+  curr_thread->waiting_for_child = true;
+  sema_init(&curr_thread->wait_child_sema, 0);
+  sema_down(&curr_thread->wait_child_sema);
+  curr_thread->waiting_for_child = false;
+  
+  printf("Child exited with status <%d>!\n", curr_thread->child_exit_status);
   return -1;
 }
 
@@ -214,6 +273,9 @@ load (const char *file_name, void (**eip) (void), void **esp)
   off_t file_ofs;
   bool success = false;
   int i;
+  //char *f = "echo";
+  
+  //file_name = f;
 
   /* Allocate and activate page directory. */
   t->pagedir = pagedir_create ();
@@ -316,9 +378,6 @@ load (const char *file_name, void (**eip) (void), void **esp)
   return success;
 }
 
-/* load() helpers. */
-
-static bool install_page (void *upage, void *kpage, bool writable);
 
 /* Checks whether PHDR describes a valid, loadable segment in
    FILE and returns true if so, false otherwise. */
@@ -422,6 +481,12 @@ load_segment (struct file *file, off_t ofs, uint8_t *upage,
       upage += PGSIZE;
     }
   return true;
+}
+
+void push_arg(void ** esp, uint32_t arg)
+{
+    *esp = *esp-4;
+    *(uint32_t *)*esp= arg;
 }
 
 /* Create a minimal stack by mapping a zeroed page at the top of
