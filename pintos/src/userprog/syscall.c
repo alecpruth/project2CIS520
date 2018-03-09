@@ -2,6 +2,7 @@
 #include <stdio.h>
 #include <debug.h>
 #include "filesys/filesys.h"
+#include "filesys/file.h"
 #include <syscall-nr.h>
 #include "threads/interrupt.h"
 #include "threads/thread.h"
@@ -57,6 +58,11 @@ static void syscall_SYS_OPEN(struct intr_frame *f){
     if( file_ptr != (struct file *)NULL) {
         f->eax = fd;
         fd_to_file_ptr[fd++] = file_ptr;
+        /*
+        char buf[20];
+        file_read(file_ptr, buf, 19);
+        printf("Content of file: <%s>\n", buf);
+        */
     }
     else {
         printf("Error loading file: <%s>\n", filename);
@@ -77,8 +83,41 @@ static void syscall_SYS_READ(struct intr_frame *f){
     
     file_ptr = fd_to_file_ptr[fd];
     
-    file_read(file_ptr, buffer, size);   
+    if(file_ptr == (struct file *)NULL)  {
+        f->eax = -1;
+        return;
+    }
+    
+    /*
+    char buf[20];
+    file_read(file_ptr, buf, size);
+    printf("Content of file: <%s>\nCharacters read: <%d>\n", buf, size);
+    */
+    
+    /* Possible design choices:
+     * 1. Only the owner of the file handle can access the file corresponding to that handle
+     * 1. If the parent thread opened a new file, then, created a new child thread, the child thread inherits the parent's file handle
+     * 1. In such cases, the child thread can access that file
+     * 1.2. In any case, no two threads are allowed to write to the same file at once
+     * 1.2. Need to implement locks to enforce exclusive write access
+     */
+    f->eax = file_read(file_ptr, buffer, size);   
 }
+
+
+static void syscall_SYS_CLOSE(struct intr_frame *f){
+    
+    int fd;
+    struct file * file_ptr;
+    
+    fd = *(int *)(f->esp+4);    
+    file_ptr = fd_to_file_ptr[fd];
+    
+    file_close(file_ptr);
+    fd_to_file_ptr[fd] = (struct file *)NULL;
+    
+}
+
 
 static void syscall_SYS_EXIT(struct intr_frame *f){
         struct thread * curr_thread = thread_current();
@@ -115,19 +154,26 @@ syscall_handler (struct intr_frame *f UNUSED)
       case SYS_WRITE:
         syscall_SYS_WRITE(f);
         break;
+        
     case SYS_OPEN:
         syscall_SYS_OPEN(f);
         break;
-      
-      case SYS_EXIT:
-        syscall_SYS_EXIT(f);
+        
+    case SYS_READ:
+        syscall_SYS_READ(f);
+        break;
+        
+    case SYS_CLOSE:
+        syscall_SYS_CLOSE(f);
         break;
       
+    case SYS_EXIT:
+        syscall_SYS_EXIT(f);
+        break;
+        
       default:
         printf("System Call <%d>!\n", f->eax);
         break;
     }
   
-  
-  //thread_exit ();
 }
