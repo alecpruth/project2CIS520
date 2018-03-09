@@ -132,6 +132,59 @@ static void syscall_SYS_EXIT(struct intr_frame *f){
 }    
 
 
+static void syscall_SYS_TELL(struct intr_frame *f){
+    
+    int fd;
+    struct file * file_ptr;
+    
+    fd = *(int *)(f->esp+4);    
+    file_ptr = fd_to_file_ptr[fd];
+    
+    
+    if(file_ptr == (struct file *)NULL)  {
+        f->eax = -1;
+        return;
+    }
+        
+    f->eax= file_tell(file_ptr);
+        
+        
+}    
+
+static void syscall_SYS_SEEK(struct intr_frame *f){
+       
+    int fd;
+    unsigned pos;
+    struct file * file_ptr;
+    
+    fd = *(int *)(f->esp+4);  
+    pos = *(unsigned *)(f->esp+8);  
+    file_ptr = fd_to_file_ptr[fd];
+
+    file_seek(file_ptr, pos);
+        
+}    
+
+static void syscall_SYS_FILESIZE(struct intr_frame *f){
+       
+   int fd;
+    struct file * file_ptr;
+    
+    fd = *(int *)(f->esp+4);    
+    file_ptr = fd_to_file_ptr[fd];
+    
+    
+    if(file_ptr == (struct file *)NULL)  {
+        f->eax = -1;
+        return;
+    }
+        
+    f->eax= file_length(file_ptr);
+        
+        
+}   
+
+
 
 static void
 syscall_handler (struct intr_frame *f UNUSED) 
@@ -161,6 +214,17 @@ syscall_handler (struct intr_frame *f UNUSED)
         
     case SYS_READ:
         syscall_SYS_READ(f);
+        break;
+        
+    case SYS_SEEK:
+        syscall_SYS_SEEK(f);
+        break;
+        
+    case SYS_TELL:
+        syscall_SYS_TELL(f);
+        break;
+    case SYS_FILESIZE:
+        syscall_SYS_FILESIZE(f);
         break;
         
     case SYS_CLOSE:

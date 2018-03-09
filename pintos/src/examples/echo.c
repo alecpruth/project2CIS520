@@ -7,6 +7,7 @@ int
 main (int argc, char **argv)
 {
   int fd;
+  char buffer[20];
   
   fd = open("sample.txt");
   printf("The fd return value is : %d\n", fd);
@@ -22,9 +23,20 @@ main (int argc, char **argv)
       break;
       
       default:  
-      printf("Buffer contains %s\n", buffer);
+      printf("Buffer contains <%s>\n", buffer);
       break;
   }
+  
+  if(filesize(fd) == 19) {
+      printf("Tell is working!\n");
+  }
+  else {
+      printf("Tell is not working!\n");
+      printf("printf filesize returned from tell is <%d>\n", filesize(fd));
+  }
+  
+  
+  //seek(fd, 19);
   
   memset(buffer, 0 , sizeof(buffer));
   //close(fd);
@@ -40,9 +52,10 @@ main (int argc, char **argv)
       break;
       
       default:  
-      printf("Buffer contains %s\n", buffer);
+      printf("Buffer contains <%s>\n", buffer);
       break;
   }
+  
 
   /*
   for (i = 0; i < argc; i++)
