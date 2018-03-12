@@ -7,9 +7,17 @@ int
 main (int argc, char **argv)
 {
   int fd;
+  //bool createFile;
+  unsigned initSize = 30;
   char buffer[20];
+  int exitStatus;
   
-  fd = open("sample.txt");
+  
+  if(create("sample1.txt", initSize)){
+      printf("File Created!!\n");
+  }
+  
+  fd = open("sample1.txt");
   printf("The fd return value is : %d\n", fd);
   
   switch( read(fd, buffer, sizeof(buffer)-1) )
@@ -27,12 +35,12 @@ main (int argc, char **argv)
       break;
   }
   
-  if(filesize(fd) == 19) {
-      printf("Tell is working!\n");
+  if((exitStatus = wait(fd)) == -1) {
+      printf("Wait is not working!\n");
   }
   else {
-      printf("Tell is not working!\n");
-      printf("printf filesize returned from tell is <%d>\n", filesize(fd));
+      printf("wait is working!\n");
+      printf("printf exit status returned from tell is <%d>\n", exitStatus);
   }
   
   

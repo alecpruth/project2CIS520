@@ -9,6 +9,7 @@
 
 static void syscall_handler (struct intr_frame *);
 
+typedef int pid_t;
 
 void
 syscall_init (void) 
@@ -167,7 +168,7 @@ static void syscall_SYS_SEEK(struct intr_frame *f){
 
 static void syscall_SYS_FILESIZE(struct intr_frame *f){
        
-   int fd;
+    int fd;
     struct file * file_ptr;
     
     fd = *(int *)(f->esp+4);    
@@ -183,6 +184,77 @@ static void syscall_SYS_FILESIZE(struct intr_frame *f){
         
         
 }   
+
+static void syscall_SYS_CREATE(struct intr_frame *f){
+       
+    unsigned init_size;
+    
+    
+    const char * filename = (const char *)*(uint32_t *)(f->esp+4);
+    init_size = *(unsigned *)(f->esp+8);
+    
+    if(filename == NULL){
+        f->eax = false;
+    }
+    
+    else {
+     f->eax = filesys_create(filename, init_size);
+    }
+        
+        
+}  
+
+static void syscall_SYS_REMOVE(struct intr_frame *f){
+       
+    
+    const char * filename = (const char *)*(uint32_t *)(f->esp+4);
+    
+    if(filename == NULL){
+        f->eax = false;
+    }
+    
+    else {
+     f->eax = filesys_remove(filename);
+    }
+  
+        
+}    
+
+static void syscall_SYS_WAIT(struct intr_frame *f){
+       
+    struct thread * curr_thread = thread_current();
+    pid_t pid = *(pid_t *)(f->esp+4);
+    
+    if(curr_thread->waiting_for_child == true){
+        f->eax = -1;
+    }
+    else{
+        process_wait((tid_t)pid);
+        f->eax = curr_thread->child_exit_status;
+    }
+   
+        
+}   
+
+static void syscall_SYS_EXEC(struct intr_frame *f){
+        
+        const char * cmd_line = (const char *)(f->esp+4);
+        
+        //note: need locks 
+        pid_t pid = (pid_t)process_execute(cmd_line);
+
+        if(pid == TID_ERROR)  {
+                f->eax = -1;
+                return;
+        }
+        
+        f->eax = pid;
+        
+        
+        
+}   
+
+
 
 
 
@@ -226,11 +298,21 @@ syscall_handler (struct intr_frame *f UNUSED)
     case SYS_FILESIZE:
         syscall_SYS_FILESIZE(f);
         break;
-        
     case SYS_CLOSE:
         syscall_SYS_CLOSE(f);
         break;
-      
+    case SYS_CREATE:
+        syscall_SYS_CREATE(f);
+        break;
+    case SYS_REMOVE:
+        syscall_SYS_REMOVE(f);
+        break;
+    case SYS_WAIT:
+        syscall_SYS_WAIT(f);
+        break;
+    case SYS_EXEC:
+        syscall_SYS_EXEC(f);
+        break;
     case SYS_EXIT:
         syscall_SYS_EXIT(f);
         break;
