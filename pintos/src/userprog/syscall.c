@@ -7,6 +7,7 @@
 #include <list.h>
 #include "threads/interrupt.h"
 #include "threads/thread.h"
+#include "userprog/process.h"
 
 static void syscall_handler (struct intr_frame *);
 
@@ -148,28 +149,23 @@ static void syscall_SYS_CLOSE(struct intr_frame *f){
 
 static void syscall_SYS_EXIT(struct intr_frame *f){
         struct thread * curr_thread = thread_current();
+        struct thread * next_waiting_thread;
         int status = *(int *)(f->esp+4);
-        struct list_elem * elem;
+        struct list_elem * next_elem;
         
-         while(!list_empty(&waiting_threads)) {
-                elem = list_pop_front(&waiting_threads);
-                next = list_entry(elem, struct thread, wait_elem);
-                
-            if( ticks > next->wakeup_ticks)
-                thread_block();
-            else { 
-                list_push_front(&waiting_threads, elem);
-               break; 
-            }
-            
-            //printf("timer_interrupt(): Thread ready to be unblocked\n");
-            
-    }
         
+         while(!list_empty(&curr_thread->waiters_list)) {
+                next_elem = list_pop_front(&curr_thread->waiters_list);
+                next_waiting_thread = list_entry(next_elem, struct thread, wait_elem);
+                next_waiting_thread->child_exit_status = status;
+                thread_unblock(next_waiting_thread);            
+         }
+        // To do: return the exit code to all the waiters
+        
+        // Get rid of the code that follows
         if(curr_thread->parent->waiting_for_child == true) {
             curr_thread->parent->child_exit_status = status;
             sema_up(&curr_thread->parent->wait_child_sema);
-            
         }
         
         curr_thread->exit_status = status;
@@ -267,26 +263,18 @@ static void syscall_SYS_REMOVE(struct intr_frame *f){
 static void syscall_SYS_WAIT(struct intr_frame *f){
        
     struct thread * curr_thread = thread_current();
-    pid_t pid = *(pid_t *)(f->esp+4);
+    pid_t waitee_thread_pid = *(pid_t *)(f->esp+4);
+    struct thread * waitee_thread = thread_list[waitee_thread_pid];
     
     // set curr_thread->waiting_for_child == true
     // We already have the id of the childthread specified as the parameter to wait
     // make a provision to wake the current thread up after the child thread exits
     // call thread_block() for this thread
     
-      list_insert(&waiting_threads, &curr_thread->wait_elem);
-      thread_block();
-        
-      
-    if(curr_thread->waiting_for_child == true){
-        f->eax = -1;
-    }
-    else{
-        process_wait((tid_t)pid);
-        f->eax = curr_thread->child_exit_status;
-    }
-   
-        
+    list_insert(&waitee_thread->waiters_list, &curr_thread->wait_elem);
+    thread_block();
+    f->eax = curr_thread->child_exit_status;
+
 }   
 
 static void syscall_SYS_EXEC(struct intr_frame *f){
@@ -300,9 +288,7 @@ static void syscall_SYS_EXEC(struct intr_frame *f){
                 f->eax = -1;
                 return;
         }
-        
         f->eax = pid;
-        
 }   
 
 

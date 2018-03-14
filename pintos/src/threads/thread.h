@@ -6,6 +6,8 @@
 #include <stdint.h>
 #include "synch.h"
 
+struct thread * thread_list[100];
+
 /* States in a thread's life cycle. */
 enum thread_status
   {
@@ -94,9 +96,10 @@ struct thread
     /* Shared between thread.c and synch.c. */
     struct list_elem elem;              /* List element. */
     struct thread * parent;             /* parent process of this thread */
-    struct list waiting_threads;        /* These are all the threads waiting for this thread to exit or terminate */
-    struct semaphore wait_child_sema;   /*thread waiting for child to finish */
-    bool waiting_for_child;             /*indicates process waiting for child to die*/
+    struct list waiters_list;           /* This is the list of all the threads waiting for this thread to exit or terminate */
+    struct list_elem wait_elem;         /* Waitlist elem */
+    struct semaphore wait_child_sema;   /* thread waiting for child to finish */
+    bool waiting_for_child;             /* indicates process waiting for child to die*/
     int child_exit_status;
     int exit_status;                    /* own exit status */
 
