@@ -4,6 +4,7 @@
 #include "filesys/filesys.h"
 #include "filesys/file.h"
 #include <syscall-nr.h>
+#include <list.h>
 #include "threads/interrupt.h"
 #include "threads/thread.h"
 
@@ -17,11 +18,14 @@ syscall_init (void)
   intr_register_int (0x30, 3, INTR_ON, syscall_handler, "syscall");
 }
 
+static struct file * fd_to_file_ptr[20];
+
 static void syscall_SYS_WRITE(struct intr_frame *f){
     int fd;
     const void *buffer;
     unsigned size;
     unsigned chars_written = 0;
+    struct file * file_ptr;
     
     fd = *(int *)(f->esp+4);
     buffer = (void *)*(uint32_t *)(f->esp+8);
@@ -36,9 +40,31 @@ static void syscall_SYS_WRITE(struct intr_frame *f){
         }
         f->eax = chars_written;
         break;
+    
+    case STDIN_FILENO:
+        // terminate the process because it is trying to write to stdin
+        // come up with a uniform implementation for all thread_exit()s
+        f->eax = -1;
+        break;
+        
+    case 2:
+        while(size--){
+            printf("%c", *(char *)buffer++);
+            chars_written++;
+        }
+        f->eax = chars_written;
+        break;
         
      default:
-        printf("Write system call!\n");
+        file_ptr = fd_to_file_ptr[fd];
+    
+        if(file_ptr == (struct file *)NULL)  {
+            f->eax = -1;
+            return;
+        }
+        //printf("Write system call!\n");
+        // To do: Validate the pointers
+        f->eax = file_write(file_ptr, buffer, size);
         break;
     }    
     
@@ -46,7 +72,7 @@ static void syscall_SYS_WRITE(struct intr_frame *f){
     //printf("Sys write");
 }
 
-static struct file * fd_to_file_ptr[20];
+
 
 static void syscall_SYS_OPEN(struct intr_frame *f){
     
@@ -123,12 +149,30 @@ static void syscall_SYS_CLOSE(struct intr_frame *f){
 static void syscall_SYS_EXIT(struct intr_frame *f){
         struct thread * curr_thread = thread_current();
         int status = *(int *)(f->esp+4);
+        struct list_elem * elem;
+        
+         while(!list_empty(&waiting_threads)) {
+                elem = list_pop_front(&waiting_threads);
+                next = list_entry(elem, struct thread, wait_elem);
+                
+            if( ticks > next->wakeup_ticks)
+                thread_block();
+            else { 
+                list_push_front(&waiting_threads, elem);
+               break; 
+            }
+            
+            //printf("timer_interrupt(): Thread ready to be unblocked\n");
+            
+    }
         
         if(curr_thread->parent->waiting_for_child == true) {
             curr_thread->parent->child_exit_status = status;
             sema_up(&curr_thread->parent->wait_child_sema);
             
         }
+        
+        curr_thread->exit_status = status;
         thread_exit();
 }    
 
@@ -225,6 +269,15 @@ static void syscall_SYS_WAIT(struct intr_frame *f){
     struct thread * curr_thread = thread_current();
     pid_t pid = *(pid_t *)(f->esp+4);
     
+    // set curr_thread->waiting_for_child == true
+    // We already have the id of the childthread specified as the parameter to wait
+    // make a provision to wake the current thread up after the child thread exits
+    // call thread_block() for this thread
+    
+      list_insert(&waiting_threads, &curr_thread->wait_elem);
+      thread_block();
+        
+      
     if(curr_thread->waiting_for_child == true){
         f->eax = -1;
     }
@@ -249,8 +302,6 @@ static void syscall_SYS_EXEC(struct intr_frame *f){
         }
         
         f->eax = pid;
-        
-        
         
 }   
 

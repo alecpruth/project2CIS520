@@ -57,13 +57,15 @@ process_execute (const char *file_name)
 static void
 start_process (void * cmd_string)
 {
-  char file_name[15];
+  char file_name[16];
   struct intr_frame if_;
   bool success;
   char * next_ptr;
   char * next_token;
   
   strlcpy(file_name, cmd_string, strcspn(cmd_string, " \t")+1);
+  struct thread * curr_thread = thread_current();
+  strlcpy(curr_thread->name,file_name,16);
  
   /* Initialize interrupt frame and load executable. */
   memset (&if_, 0, sizeof if_);
@@ -146,7 +148,7 @@ process_wait (tid_t child_tid UNUSED)
   sema_down(&curr_thread->wait_child_sema);
   curr_thread->waiting_for_child = false;
   
-  printf("Child exited with status <%d>!\n", curr_thread->child_exit_status);
+  //printf("Child exited with status <%d>!\n", curr_thread->child_exit_status);
   return -1;
 }
 
@@ -169,6 +171,7 @@ process_exit (void)
          directory before destroying the process's page
          directory, or our active page directory will be one
          that's been freed (and cleared). */
+      printf("%s: exit(%d)\n",cur->name,cur->exit_status);
       cur->pagedir = NULL;
       pagedir_activate (NULL);
       pagedir_destroy (pd);

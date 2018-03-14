@@ -22,3 +22,10 @@ pintos -f -q;
 pintos -p ../../examples/echo -a echo -- -q;
 pintos -p ../../userprog/sample.txt -a sample.txt -- -q
 pintos -q run 'echo x';
+
+#pintos -p ../../userprog/build/tests/userprog/args-none -a args-none -- -q;
+#pintos -p ../../userprog/build/tests/userprog/args-many -a args-many -- -q;
+#pintos -p ../../userprog/build/tests/userprog/args-multiple -a args-multiple -- -q;
+#pintos -p ../../userprog/build/tests/userprog/args-single -a args-single -- -q;
+#pintos -p ../../userprog/build/tests/userprog/args-dbl-space -a args-dbl-space -- -q;
+#pintos -q run 'args-none';

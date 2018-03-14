@@ -1,11 +1,14 @@
 #include <stdio.h>
 #include <syscall.h>
 #include <string.h>
+#include "tests/lib.c"
 
     
 int
 main (int argc, char **argv)
 {
+    //msg("Cre+Alec+Travis team");
+    
   int fd;
   //bool createFile;
   unsigned initSize = 30;
@@ -35,13 +38,13 @@ main (int argc, char **argv)
       break;
   }
   
-  if((exitStatus = wait(fd)) == -1) {
+  /*if((exitStatus = wait(fd)) == -1) {
       printf("Wait is not working!\n");
   }
   else {
       printf("wait is working!\n");
       printf("printf exit status returned from tell is <%d>\n", exitStatus);
-  }
+  }*/
   
   
   //seek(fd, 19);
@@ -70,5 +73,6 @@ main (int argc, char **argv)
     printf ("%s ", argv[i]);
   printf ("\n");
   */
+  
   return EXIT_SUCCESS;
 }

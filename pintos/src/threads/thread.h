@@ -94,9 +94,11 @@ struct thread
     /* Shared between thread.c and synch.c. */
     struct list_elem elem;              /* List element. */
     struct thread * parent;             /* parent process of this thread */
+    struct list waiting_threads;        /* These are all the threads waiting for this thread to exit or terminate */
     struct semaphore wait_child_sema;   /*thread waiting for child to finish */
     bool waiting_for_child;             /*indicates process waiting for child to die*/
     int child_exit_status;
+    int exit_status;                    /* own exit status */
 
 #ifdef USERPROG
     /* Owned by userprog/process.c. */
