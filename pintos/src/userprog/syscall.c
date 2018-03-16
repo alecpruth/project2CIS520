@@ -1,4 +1,5 @@
 #include "userprog/syscall.h"
+#include "userprog/pagedir.h"
 #include <stdio.h>
 #include <debug.h>
 #include "filesys/filesys.h"
@@ -8,8 +9,34 @@
 #include "threads/interrupt.h"
 #include "threads/thread.h"
 #include "userprog/process.h"
+#include "threads/vaddr.h"
 
 static void syscall_handler (struct intr_frame *);
+bool valid_ptr(void *ptr);
+bool valid_fd(int fd);
+static struct file * fd_to_file_ptr[20];
+
+bool valid_ptr(void * ptr)
+{
+    if( (ptr == NULL) || !is_user_vaddr(ptr) || !pagedir_get_page(thread_current()->pagedir, ptr) )
+    {
+        return false;
+    }
+    
+    else {
+        return true;
+    }
+}
+
+bool valid_fd(int fd)
+{
+    if(fd_to_file_ptr[fd] == (struct file *)0){
+        return false;
+    }
+    else{
+        return true;
+    }
+}
 
 typedef int pid_t;
 
@@ -19,7 +46,7 @@ syscall_init (void)
   intr_register_int (0x30, 3, INTR_ON, syscall_handler, "syscall");
 }
 
-static struct file * fd_to_file_ptr[20];
+static void syscall_SYS_EXIT(struct intr_frame *f);
 
 static void syscall_SYS_WRITE(struct intr_frame *f){
     int fd;
@@ -31,6 +58,13 @@ static void syscall_SYS_WRITE(struct intr_frame *f){
     fd = *(int *)(f->esp+4);
     buffer = (void *)*(uint32_t *)(f->esp+8);
     size = *(unsigned *)(f->esp+12);
+    
+    /*if(!valid_fd(fd)){
+        *(uint32_t *)f->esp = SYS_EXIT;
+        *(int *)(f->esp+4) = -1;
+        syscall_SYS_EXIT(f);
+        return;
+    }*/
     
     switch(fd){
         
@@ -57,6 +91,8 @@ static void syscall_SYS_WRITE(struct intr_frame *f){
         break;
         
      default:
+     
+     
         file_ptr = fd_to_file_ptr[fd];
     
         if(file_ptr == (struct file *)NULL)  {
@@ -73,17 +109,24 @@ static void syscall_SYS_WRITE(struct intr_frame *f){
     //printf("Sys write");
 }
 
-
-
 static void syscall_SYS_OPEN(struct intr_frame *f){
     
     static int fd = 3;
     struct file *file_ptr;
     
     char * filename = (char *)*(uint32_t *)(f->esp+4);
+    
+    if( !valid_ptr(filename) ) {
+        *(uint32_t *)f->esp = SYS_EXIT;
+        *(int *)(f->esp+4) = -1;
+        syscall_SYS_EXIT(f);
+        return;
+    }
+    
     file_ptr = filesys_open(filename);
     
-    if( file_ptr != (struct file *)NULL) {
+    
+    if( file_ptr != (struct file *)NULL ) {
         f->eax = fd;
         fd_to_file_ptr[fd++] = file_ptr;
         /*
@@ -93,7 +136,6 @@ static void syscall_SYS_OPEN(struct intr_frame *f){
         */
     }
     else {
-        printf("Error loading file: <%s>\n", filename);
         f->eax = -1;
     }
 }
@@ -108,6 +150,13 @@ static void syscall_SYS_READ(struct intr_frame *f){
     fd = *(int *)(f->esp+4);
     buffer = (char *)*(uint32_t *)(f->esp+8);
     size = *(unsigned *)(f->esp+12);
+    
+    /*if(!valid_fd(fd)){
+        *(uint32_t *)f->esp = SYS_EXIT;
+        *(int *)(f->esp+4) = -1;
+        syscall_SYS_EXIT(f);
+        return;
+    }*/
     
     file_ptr = fd_to_file_ptr[fd];
     
@@ -139,6 +188,14 @@ static void syscall_SYS_CLOSE(struct intr_frame *f){
     struct file * file_ptr;
     
     fd = *(int *)(f->esp+4);    
+    
+    /*if(!valid_fd(fd)){
+        *(uint32_t *)f->esp = SYS_EXIT;
+        *(int *)(f->esp+4) = -1;
+        syscall_SYS_EXIT(f);
+        return;
+    }*/
+    
     file_ptr = fd_to_file_ptr[fd];
     
     file_close(file_ptr);
@@ -155,6 +212,7 @@ static void syscall_SYS_EXIT(struct intr_frame *f){
         
         
          while(!list_empty(&curr_thread->waiters_list)) {
+                //printf("sending status to waiter\n");
                 next_elem = list_pop_front(&curr_thread->waiters_list);
                 next_waiting_thread = list_entry(next_elem, struct thread, wait_elem);
                 next_waiting_thread->child_exit_status = status;
@@ -167,7 +225,7 @@ static void syscall_SYS_EXIT(struct intr_frame *f){
             curr_thread->parent->child_exit_status = status;
             sema_up(&curr_thread->parent->wait_child_sema);
         }
-        
+        //printf("exiting\n");
         curr_thread->exit_status = status;
         thread_exit();
 }    
@@ -178,7 +236,15 @@ static void syscall_SYS_TELL(struct intr_frame *f){
     int fd;
     struct file * file_ptr;
     
-    fd = *(int *)(f->esp+4);    
+    fd = *(int *)(f->esp+4);  
+    
+    /*if(!valid_fd(fd)){
+        *(uint32_t *)f->esp = SYS_EXIT;
+        *(int *)(f->esp+4) = -1;
+        syscall_SYS_EXIT(f);
+        return;
+    }*/
+      
     file_ptr = fd_to_file_ptr[fd];
     
     
@@ -200,6 +266,14 @@ static void syscall_SYS_SEEK(struct intr_frame *f){
     
     fd = *(int *)(f->esp+4);  
     pos = *(unsigned *)(f->esp+8);  
+    
+    /*if(!valid_fd(fd)){
+        *(uint32_t *)f->esp = SYS_EXIT;
+        *(int *)(f->esp+4) = -1;
+        syscall_SYS_EXIT(f);
+        return;
+    }*/
+    
     file_ptr = fd_to_file_ptr[fd];
 
     file_seek(file_ptr, pos);
@@ -211,7 +285,15 @@ static void syscall_SYS_FILESIZE(struct intr_frame *f){
     int fd;
     struct file * file_ptr;
     
-    fd = *(int *)(f->esp+4);    
+    fd = *(int *)(f->esp+4);   
+    
+    /*if(!valid_fd(fd)){
+        *(uint32_t *)f->esp = SYS_EXIT;
+        *(int *)(f->esp+4) = -1;
+        syscall_SYS_EXIT(f);
+        return;
+    }*/
+     
     file_ptr = fd_to_file_ptr[fd];
     
     
@@ -233,8 +315,11 @@ static void syscall_SYS_CREATE(struct intr_frame *f){
     const char * filename = (const char *)*(uint32_t *)(f->esp+4);
     init_size = *(unsigned *)(f->esp+8);
     
-    if(filename == NULL){
-        f->eax = false;
+    if(filename == NULL || !valid_ptr(filename)){
+        *(uint32_t *)f->esp = SYS_EXIT;
+        *(int *)(f->esp+4) = -1;
+        syscall_SYS_EXIT(f);
+        return;
     }
     
     else {
@@ -249,8 +334,12 @@ static void syscall_SYS_REMOVE(struct intr_frame *f){
     
     const char * filename = (const char *)*(uint32_t *)(f->esp+4);
     
-    if(filename == NULL){
-        f->eax = false;
+    if(filename == NULL || !valid_ptr(filename)){
+        //f->eax = false;
+        *(uint32_t *)f->esp = SYS_EXIT;
+        *(int *)(f->esp+4) = -1;
+        syscall_SYS_EXIT(f);
+        return;
     }
     
     else {
@@ -271,24 +360,48 @@ static void syscall_SYS_WAIT(struct intr_frame *f){
     // make a provision to wake the current thread up after the child thread exits
     // call thread_block() for this thread
     
-    list_insert(&waitee_thread->waiters_list, &curr_thread->wait_elem);
+    //If it is already in waitee list do not wait
+    /*if(curr_thread->waitee_list == NULL){
+        f->eax = -1;
+        return;
+    }
+    struct list_elem trav = list_begin(&curr_thread->waitee_list);
+    while(trav != list_tail(&curr_thread->waitee_list){
+        if(trav == &waitee_thread->waitee_elem){
+            f->eax = -1;
+            return;
+        }
+        trav = trav->next;
+    }
+    list_push_back(&curr_thread->waitee_list, &waitee_thread->waitee_elem);*/
+    
+    list_push_back(&waitee_thread->waiters_list, &curr_thread->wait_elem);
+    
+    
+    enum intr_level old_level;
+    old_level = intr_disable();
     thread_block();
+    intr_set_level(old_level);
+    //printf("Waiting on child\n");
     f->eax = curr_thread->child_exit_status;
 
 }   
 
 static void syscall_SYS_EXEC(struct intr_frame *f){
         
-        const char * cmd_line = (const char *)(f->esp+4);
+        const char * cmd_line = (char *)*(uint32_t *)(f->esp+4);
         
         //note: need locks 
+        //printf("About to execute\n");
         pid_t pid = (pid_t)process_execute(cmd_line);
+        //printf("executed!\n");
 
         if(pid == TID_ERROR)  {
                 f->eax = -1;
                 return;
         }
         f->eax = pid;
+        //printf("leaving exec\n");
 }   
 
 

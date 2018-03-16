@@ -20,12 +20,15 @@ cd build
 pintos-mkdisk filesys.dsk --filesys-size=2;
 pintos -f -q;
 pintos -p ../../examples/echo -a echo -- -q;
-pintos -p ../../userprog/sample.txt -a sample.txt -- -q
-pintos -q run 'echo x';
+#pintos -p ../../userprog/sample.txt -a sample.txt -- -q
+#pintos -q run 'echo x';
 
-#pintos -p ../../userprog/build/tests/userprog/args-none -a args-none -- -q;
+#pintos -p ../../userprog/build/tests/userprog/open-bad-ptr -a open-bad-ptr -- -q;
 #pintos -p ../../userprog/build/tests/userprog/args-many -a args-many -- -q;
 #pintos -p ../../userprog/build/tests/userprog/args-multiple -a args-multiple -- -q;
 #pintos -p ../../userprog/build/tests/userprog/args-single -a args-single -- -q;
 #pintos -p ../../userprog/build/tests/userprog/args-dbl-space -a args-dbl-space -- -q;
-#pintos -q run 'args-none';
+pintos -p ../../userprog/build/tests/userprog/wait-twice -a wait-twice -- -q;
+pintos -p ../../userprog/build/tests/userprog/child-simple -a child-simple -- -q;
+pintos -p ../../userprog/build/tests/userprog/create-bad-ptr -a create-bad-ptr -- -q;
+pintos -q run 'create-bad-ptr';

@@ -97,6 +97,8 @@ struct thread
     struct list_elem elem;              /* List element. */
     struct thread * parent;             /* parent process of this thread */
     struct list waiters_list;           /* This is the list of all the threads waiting for this thread to exit or terminate */
+    struct list waitee_list;
+    struct list_elem waitee_elem;
     struct list_elem wait_elem;         /* Waitlist elem */
     struct semaphore wait_child_sema;   /* thread waiting for child to finish */
     bool waiting_for_child;             /* indicates process waiting for child to die*/
