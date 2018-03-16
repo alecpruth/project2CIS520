@@ -30,7 +30,7 @@ bool valid_ptr(void * ptr)
 
 bool valid_fd(int fd)
 {
-    if(fd_to_file_ptr[fd] == (struct file *)0){
+    if( (fd < 0) || (fd >= 20) || (fd_to_file_ptr[fd] == (struct file *)0)){
         return false;
     }
     else{
@@ -59,13 +59,6 @@ static void syscall_SYS_WRITE(struct intr_frame *f){
     buffer = (void *)*(uint32_t *)(f->esp+8);
     size = *(unsigned *)(f->esp+12);
     
-    /*if(!valid_fd(fd)){
-        *(uint32_t *)f->esp = SYS_EXIT;
-        *(int *)(f->esp+4) = -1;
-        syscall_SYS_EXIT(f);
-        return;
-    }*/
-    
     switch(fd){
         
      case STDOUT_FILENO:
@@ -91,7 +84,10 @@ static void syscall_SYS_WRITE(struct intr_frame *f){
         break;
         
      default:
-     
+        if(!valid_fd(fd)){
+            f->eax = -1;
+            return;
+        }
      
         file_ptr = fd_to_file_ptr[fd];
     

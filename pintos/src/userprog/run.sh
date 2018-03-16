@@ -31,4 +31,5 @@ pintos -p ../../examples/echo -a echo -- -q;
 pintos -p ../../userprog/build/tests/userprog/wait-twice -a wait-twice -- -q;
 pintos -p ../../userprog/build/tests/userprog/child-simple -a child-simple -- -q;
 pintos -p ../../userprog/build/tests/userprog/create-bad-ptr -a create-bad-ptr -- -q;
-pintos -q run 'create-bad-ptr';
+pintos -p ../../userprog/build/tests/userprog/write-bad-fd -a write-bad-fd -- -q;
+pintos -q run 'write-bad-fd';
