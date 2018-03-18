@@ -1,0 +1,144 @@
+CIS 520
+Project 2: User Programs
+Design Document
+
+---- GROUP ----
+
+Travis Atchison
+Cre Moore
+Alec Ruth
+
+---- PRELIMINARIES ----
+
+
+
+			ARGUMENT PASSING
+			================
+---- DATA STRUCTURES ----
+A1.
+process.c
+	#define INITIAL_USER_PAGE 0x08048000 - PGSIZE
+	Creates a new page that is used for argument passing.
+	
+---- ALGORITHMS ----
+A2. We start argument passing in start_process in process.c. First off, we use strtok_r to 
+seperate the command from the arguments in the command line. The command is the thread's name, 
+and we pass the rest of the argument string to start_process(), load(), and setup_stack().
+
+When pushing arguments to the stack, we copy the arguments onto the INITISL_USER_PAGE.
+Then we seperate each individual argument from the string and add it to argv. Finally, we push 
+argv, argc, and the return address onto the stack. We prevented stack overflow by creating INITIAL_USER_PAGE
+to pass in the arguments.
+
+---- RATIONALE ----
+A3. Pintos implements strtok_r() and not strtok() because it is reentrant, meaning it keeps track of
+the changes made in previous calls to the same string. This is more helpful in situations where
+a string needs to be parsed multiple times, line the command line, so it makes more sense for pintos
+to use strtok_r() over strtok().
+
+A4. Two advantages are that it decreases the amount of time that is spent in the kernel and that it
+means you can use better checking methods to ensure that the kernel won't fail during execution.
+
+			SYSTEM CALLS
+			============
+---- DATA STRUCTURES ----
+A1.
+thread.h
+	struct thread * parent
+		Keeps track of a thread's parent
+	struct list waiters_list
+		Keeps track of all threads waiting on this thread
+	struct list_elem wait_elem
+		The list element for use in waiters_list of other threads
+	struct semaphore wait_child
+		A semaphore to ensure that the thread waits for the child
+	bool waiting_for_child
+		Indicates if the thread is waiting for a child
+	int child_exit_status
+		Most recnet child's exit status
+	int exit_status
+		Own thread's exit status. Used for exit() messages
+	struct list waitee_list
+		List of all threads that this thread is/has waited on.
+	struct list_elem waitee_elem
+		List element for use in waitee_list
+
+syscall.c
+	bool valid_ptr(void * ptr)
+		Function used to identify if the ptr is valid and not NULL or referencing bad memory
+	bool valid_fd(int fd)
+		Function used to make sure the provided file descriptor actually points to an open file
+	static struct file * fd_to_file_ptr[20]
+		Used to connect file descriptors to the files they reference
+		
+process.c
+	process_exit
+		Added a printf() statement that lists the thread's name and exit status. Used here so 
+		it only prints for user programs.
+		
+B2. The fd_to_file_ptr array keeps track of each file descriptor and which file they reference.
+The file descriptor is an entry in the array and that entry is the open file they refer to. The 
+file descriptors are unique to each process, not within the entire OS.
+
+---- ALGORITHMS ----
+B3. For reading in information, we first pull in the file descriptor(fd), the buffer, and the size.
+Then we obtain the open file that the file descriptor references and check that the file is valid.
+If so, we call file_read(file_ptr, buffer, size) from filesys.c and push the return value to the 
+eax register. We should also check to make sure that the file descriptor and file pointers are valid,
+but we were not able to successfully implement that in the time we had remaining.
+
+Writing information is very similar to reading it. However, what we do depends on the value of fd.
+If fd is STDOUT_FILENO, then we print each character from the buffer to the console. If fd is STDIN_FILENO,
+we return -1 and terminate, since they are trying to write to input. Then if fd is any other value, it
+is pointing to a file, so we grab the file pointer fd refers to, and call file_write to write to the file.
+In this last case, if either the file descriptor or file pointer are bad, then we return -1 and terminate
+the call. Unfortunately, while we passed the write_bad_fd test, we were unable to pass the write_bad_ptr
+test. We are unsure as to why this is the case, since we have tried doing the same thing that works
+in other syscalls, but still failed.
+
+B4.For a full page, the least number of inspecitons would be 1, and the greatest number of inspections
+would be 4096. If the page is contiguous, then the maximum number of inspections would be 2. If only two 
+bytes are being read in, then the smallest number of inspections is 1 and the greatest number of inspections 
+is 2.
+
+B5. When a thread calls wait(), we insert the current thread into the waitee threads list of 
+waiters and then block it. When a process terminates, it checks to see if any threads are waiting
+on it. If so, it saves it removes each thread from that list, saves it exit status in the waiter's
+child_exit_status, and then unblocks the thread.
+
+B6. Avoiding bad user memory access is done by checking that the pointer is referning valid memory
+before proceeding. We did this by using valid_ptr() and valid_fd() to check that the file pointers and
+file descriptors were not NULL or referencing invalid memory. While these functions did work as intended,
+we were not able to pass many of the bad_fd and bad_ptr tests. This seems to be because of not being sure
+what to do if an bad ptr or fd is found. In some cases we were supposed to terminate immediately, and in
+other cases we just returned -1 and exited. Cre and I were not able to identify the correct responses in 
+many of these cases, and by the time we reached this problem spring break had started, so we decided to 
+leave things as they were.
+
+---- SYNCHRONIZATION ----
+B7. We ensure that the process waits for the new executable by calling process_execute() and saving its 
+return value. Process_execute returns the pid of the new process or TID_ERROR if it failed, this means that
+it will not return a value until it is sure the process has successfully loaded or failed to load. Since
+we are making sure to obtain that reutrn value before continuing, we can be reasonably sure that the process
+will not continue until it receives word on the success/failure of exec. The process that calls exec receives
+word on success/failure through the return value of process_execute and syscall_SYS_EXIT. If the return value 
+is TID_ERROR, then syscall_SYS_EXIT returns -1 to indicate failure. Otherwise, syscall_SYS_EXIT returns the 
+new process's pid.
+
+B8. We ensure synchonization when P calls wait(C) before C exits by blocking P when it makes the call. 
+However, Cre and I did not find time to implement situations for when P calls wait(C) after C exits. 
+We ensure that resources are freed in process_execute() for all threads. If P exits before waiting on C,
+there isn't an issue becuase C only cares about parents exiting when that parent is waiting for them and 
+it has access to all information that the parent had when it was created. We did not prepare for any other
+special circumstances.
+
+---- RATIONALE ----
+B9. We chose this method because it was the easiest for us to understand and it was reccomended to us
+by Chandra. We made sure it worked by validating our methods to ensure it would access the correct information
+given to it, and we found that our methods worked for the most part.
+
+B10. The advantage of our design is that it is straightforward and easy to use. The disadvantages are that
+we can run out of space in the array if too many files are opened at once and we don't always know the source
+of each syscall.
+
+B11.We did not change the default tid to pid matching.
