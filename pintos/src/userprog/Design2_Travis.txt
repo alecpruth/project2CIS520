@@ -9,8 +9,7 @@ Cre Moore
 Alec Ruth
 
 ---- PRELIMINARIES ----
-
-
+Like in Project 1, our group received substantial guidance and help from the TA, Chandra.
 
 			ARGUMENT PASSING
 			================
